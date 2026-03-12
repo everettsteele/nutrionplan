@@ -916,7 +916,7 @@ canvas#weightChart { width: 100%; height: 120px; }
       <input class="inp" type="text" id="ob-name" placeholder="Jane Smith" autocomplete="name">
     </div>
     <div class="wz-field">
-      <label class="wz-field-lbl">Username <span class="ob-optional">(optional)</span></label>
+      <label class="wz-field-lbl">Username</label>
       <input class="inp" type="text" id="ob-username" placeholder="janesmith" autocomplete="username">
     </div>
     <div class="wz-field">
@@ -1066,6 +1066,7 @@ async function obSubmit() {
   const errEl = document.getElementById('ob-err');
   errEl.textContent = '';
   if (!name) { errEl.textContent = 'Please enter your name.'; return; }
+  if (!username) { errEl.textContent = 'Please enter a username.'; return; }
   if (!dob) { errEl.textContent = 'Please enter your date of birth.'; return; }
   if (!obGender) { errEl.textContent = 'Please select your gender.'; return; }
   const btn = document.getElementById('ob-submit-btn');

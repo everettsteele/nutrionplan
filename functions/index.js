@@ -10,6 +10,10 @@ const PLAN_SCHEMA_VERSION = 1;
 
 // ── Prompt builder ──────────────────────────────────────────────────────────
 
+const SYSTEM_PROMPT = `You are a precision nutrition and training coach. Your job is to generate a fully personalized, evidence-based plan based on a user's inputs. You return only valid JSON — no markdown, no explanation, no commentary. Your output will be parsed directly by a machine.
+
+The plan must be realistic, specific, and immediately actionable. Do not use filler meals or generic advice. Every meal should have accurate macros. Every recipe should be cookable by a normal person in a normal kitchen.`;
+
 function buildPrompt(inputs) {
   const goalLabel = {
     lose_fat: 'fat loss (reduce body fat while preserving muscle)',
@@ -30,83 +34,126 @@ function buildPrompt(inputs) {
     full: 'full prep — will do whatever the plan requires',
   }[inputs.cookingLevel] || inputs.cookingLevel;
 
-  const suppLabel = inputs.supplementsInclude === 'no'
+  const allergyList = inputs.allergies && inputs.allergies.length
+    ? inputs.allergies.join(', ')
+    : 'none';
+
+  const equipmentList = inputs.equipment && inputs.equipment.length
+    ? inputs.equipment.join(', ')
+    : 'not specified';
+
+  const supplementList = inputs.supplementsInclude === 'no'
     ? 'none requested'
-    : inputs.supplements.length
+    : inputs.supplements && inputs.supplements.length
       ? inputs.supplements.join(', ')
       : 'open to evidence-based recommendations';
 
-  return `You are a certified nutritionist and personal trainer. Generate a complete, personalized ${inputs.timeline}-week nutrition and training plan optimized for ${goalLabel}.
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const trainingDayNames = (inputs.trainingDays || []).map(d => dayNames[d]).join(', ');
 
-USER PROFILE:
+  return `Generate a complete nutrition and training plan for the following person:
+
+GOALS
 - Primary goal: ${goalLabel}
 - Current weight: ${inputs.currentWeight} ${inputs.weightUnit}
 - Goal weight: ${inputs.goalWeight} ${inputs.weightUnit}
 - Current body fat: ${inputs.currentBf ? inputs.currentBf + '%' : 'not provided'}
-- Diet type: ${dietLabel}
-- Diet notes: ${inputs.dietNotes || 'none'}
-- Food allergies/restrictions: ${inputs.allergies.length ? inputs.allergies.join(', ') : 'none'}
-- Additional restrictions: ${inputs.allergyNotes || 'none'}
+- Timeline: ${inputs.timeline || 8} weeks
+
+DIET
+- Diet type: ${dietLabel}${inputs.dietNotes ? '\n- Additional diet notes: ' + inputs.dietNotes : ''}
+- Allergies and foods to avoid: ${allergyList}${inputs.allergyNotes ? '\n- Additional allergy notes: ' + inputs.allergyNotes : ''}
 - Cooking comfort level: ${cookingLabel}
+
+TRAINING
 - Training days per week: ${inputs.trainingDaysPerWeek}
-- Preferred training days: ${inputs.trainingDays.map(d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]).join(', ')}
-- Primary training type: ${inputs.trainingType}
-- Equipment available: ${inputs.equipment.length ? inputs.equipment.join(', ') : 'not specified'}
-- Supplements: ${suppLabel}
-- Supplement notes: ${inputs.supplementNotes || 'none'}
+- Training days: ${trainingDayNames} (0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat)
+- Training type: ${inputs.trainingType}
+- Equipment available: ${equipmentList}
 
-INSTRUCTIONS:
-1. Calculate appropriate daily calorie and macro targets (protein, carbs, fat) based on the user's current weight, goal weight, timeline, and goal type.
-2. Training days should be the user's preferred days. Rest days use lower calories/carbs.
-3. Design a practical weekly meal rotation that strictly respects the diet type and restrictions.
-4. If cooking level is minimal, prioritize no-cook and quick-assemble meals; skip or minimize batch prep.
-5. If moderate or full, include batch prep sessions (Sunday and/or Thursday).
-6. Write complete, real recipes for all cooked meals (not just meal names).
-7. Shopping list should cover exactly one week of the plan.
-8. All meals must hit macro targets reasonably closely.
+SUPPLEMENTS
+- Supplement preference: ${inputs.supplementsInclude}
+- Supplements: ${supplementList}${inputs.supplementNotes ? '\n- Supplement notes: ' + inputs.supplementNotes : ''}
 
-Return ONLY a raw JSON object — no markdown, no explanation, no code fences. The JSON must exactly match this structure:
+CONSTRAINTS
+- Never include ingredients the user is allergic to or has listed as avoided
+- Respect the diet type strictly
+- Macro targets must reflect a realistic deficit or surplus for the stated goal
+- Protein must be at least 0.8g per lb of current body weight, ideally 1g/lb
+- Carbs and calories should cycle: higher on training days, lower on rest days
+- Cooking complexity must match the stated cooking comfort level
+- All 7 days of the week must be covered (days 0–6)
+- Training days must exactly match the trainingDays array provided
+- Generate at least 6 recipes, maximum 12
+- Shopping list must cover exactly one week of the plan
+- Prep plan should have at most 2 sessions per week (e.g. Sunday + one other)
+
+Return a single JSON object matching this exact schema. No markdown fences. No keys outside this schema. No null values — use empty strings or empty arrays instead.
 
 {
   "weeklyPlan": {
-    "0": { "type": "training|rest", "meals": [{ "time": "str", "name": "str", "desc": "str", "cal": num, "p": num, "c": num, "f": num }] },
-    "1": { "type": "training|rest", "meals": [...] },
-    "2": { "type": "training|rest", "meals": [...] },
-    "3": { "type": "training|rest", "meals": [...] },
-    "4": { "type": "training|rest", "meals": [...] },
-    "5": { "type": "training|rest", "meals": [...] },
-    "6": { "type": "training|rest", "meals": [...] }
+    "0": {
+      "type": "training or rest",
+      "meals": [
+        {
+          "time": "string (e.g. 7–8 AM)",
+          "name": "string",
+          "desc": "string (brief description of what it is)",
+          "cal": number,
+          "p": number,
+          "c": number,
+          "f": number
+        }
+      ]
+    },
+    "1": { "type": "...", "meals": [...] },
+    "2": { "type": "...", "meals": [...] },
+    "3": { "type": "...", "meals": [...] },
+    "4": { "type": "...", "meals": [...] },
+    "5": { "type": "...", "meals": [...] },
+    "6": { "type": "...", "meals": [...] }
   },
   "macroTargets": {
-    "training": { "cal": num, "p": num, "c": num, "f": num },
-    "rest": { "cal": num, "p": num, "c": num, "f": num }
+    "training": { "cal": number, "p": number, "c": number, "f": number },
+    "rest":     { "cal": number, "p": number, "c": number, "f": number }
   },
   "recipes": [
     {
-      "name": "str",
-      "cat": "Batch Cook|Quick Prep|Salads & Bowls|No Cook",
-      "prep": "str (e.g. 5 min)",
-      "cook": "str (e.g. 20 min)",
-      "serves": num,
-      "macros": { "cal": num, "p": num, "c": num, "f": num },
-      "ingredients": ["str"],
-      "steps": ["str"]
+      "name": "string",
+      "cat": "Batch Cook or Salads & Bowls or Quick Meals",
+      "prep": "string (e.g. 10 min)",
+      "cook": "string (e.g. 20 min)",
+      "serves": number,
+      "macros": { "cal": number, "p": number, "c": number, "f": number },
+      "ingredients": ["string"],
+      "steps": ["string"]
     }
   ],
   "prepPlan": {
-    "sun": { "label": "str (e.g. Covers Mon–Thu)", "items": [{ "id": "s1", "name": "str", "note": "str", "time": "str" }] },
-    "thu": { "label": "str", "items": [{ "id": "t1", "name": "str", "note": "str", "time": "str" }] }
+    "sun": {
+      "label": "string (e.g. COVERS MON → WED DINNERS)",
+      "items": [
+        { "id": "s1", "name": "string", "note": "string", "time": "string (e.g. 25 min passive)" }
+      ]
+    },
+    "thu": {
+      "label": "string",
+      "items": [
+        { "id": "t1", "name": "string", "note": "string", "time": "string" }
+      ]
+    }
   },
   "shoppingList": [
-    { "cat": "str (e.g. Proteins)", "items": [{ "id": "sh1", "name": "str", "qty": "str" }] }
+    {
+      "cat": "string (e.g. PROTEINS, PRODUCE, PANTRY)",
+      "items": [
+        { "id": "sh1", "name": "string", "qty": "string (e.g. 500g, 2 cans, or empty string)" }
+      ]
+    }
   ],
-  "supplements": ["str (e.g. Creatine — 5g/day with water, timing flexible)"],
-  "notes": "str (1–2 sentences summarising the plan approach)"
-}
-
-Day numbering: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday.
-If cooking level is minimal, prepPlan items arrays may be empty but the keys must still exist.
-Every meal object must have all six fields: time, name, desc, cal, p, c, f.`;
+  "supplements": ["string (each supplement as a plain string recommendation)"],
+  "notes": "string (any important notes about the plan, or empty string)"
+}`;
 }
 
 // ── Validator ───────────────────────────────────────────────────────────────
@@ -170,6 +217,7 @@ exports.generatePlan = onCall({ timeoutSeconds: 300, memory: '512MiB' }, async (
       const message = await client.messages.create({
         model: 'claude-opus-4-6',
         max_tokens: 8000,
+        system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: prompt }],
       });
 

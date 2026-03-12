@@ -1438,6 +1438,11 @@ async function loadUserPlan() {
       Object.keys(plan.weeklyPlan).forEach(dow => {
         activeMeals[parseInt(dow)] = plan.weeklyPlan[dow];
       });
+      // Rebuild TRAINING_DAYS from the generated plan so day tab styling is accurate
+      TRAINING_DAYS.clear();
+      Object.entries(plan.weeklyPlan).forEach(([dow, day]) => {
+        if (day.type === 'training') TRAINING_DAYS.add(parseInt(dow));
+      });
     }
     if (plan.macroTargets) activeMacroTargets = plan.macroTargets;
     if (plan.recipes && plan.recipes.length > 0) {

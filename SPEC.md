@@ -239,13 +239,15 @@ The function reads `process.env.ANTHROPIC_API_KEY`.
 **Flow:**
 1. Verify Firebase Auth token
 2. Validate wizard inputs (goal, currentWeight, goalWeight required)
-3. Build structured prompt from wizard inputs
-4. Call `claude-opus-4-6` with `max_tokens: 8000`
+3. Build prompt from wizard inputs (system prompt + user prompt)
+4. Call `claude-opus-4-6` with `max_tokens: 8000`, `system: SYSTEM_PROMPT`
 5. Strip markdown fences if present, parse JSON
 6. Validate JSON structure (all 7 days, macroTargets, recipes, shoppingList, prepPlan)
 7. Retry once on parse/validation failure
 8. Save `wizardInputs`, `plan`, `planMeta` to Firestore with `merge: true`
 9. Return `{ success: true }`
+
+**Prompt structure:** Two-part. `SYSTEM_PROMPT` defines the coach persona and JSON-only output requirement. `buildPrompt(inputs)` builds the user-turn with the full user profile, constraints, and exact JSON schema.
 
 **Deployment:**
 ```bash
@@ -353,11 +355,14 @@ showPage(name, btn)
 
 ## Open questions / decisions
 
-- Firebase project must be upgraded to **Blaze plan** to deploy Cloud Functions. Free Spark plan does not support them.
 - `ANTHROPIC_API_KEY` must be set as a Cloud Functions environment variable (via `firebase functions:secrets:set ANTHROPIC_API_KEY` or Firebase Console → Functions → Environment variables).
-- Plan consumption: after `loadUserPlan()`, the active data overrides work for meals, recipes, prep, shop. However, `TRAINING_DAYS` (which days are training vs rest) is still a hardcoded constant. A generated plan that sets different training days will correctly mark days as `type: "training"` in `weeklyPlan`, but `TRAINING_DAYS` (used for day tab styling) won't reflect this. This should be updated in `loadUserPlan()`.
 - Should `wizardInputs` be considered sensitive data? It includes body weight and body fat — likely fine in Firestore given one-user context, but worth noting.
 - The `planMeta.startDate` is set to the date the plan was generated, not the user's actual program start. These may differ.
+
+### Resolved
+
+- ~~Firebase Blaze plan required~~ — Project upgraded to Blaze. Cloud Functions deployable.
+- ~~`TRAINING_DAYS` not updated from generated plan~~ — Fixed in `loadUserPlan()`: after loading `weeklyPlan`, `TRAINING_DAYS` is rebuilt in place via `.clear()` and `.add()` so day tab styling reflects the generated plan's training/rest split.
 
 ---
 

@@ -588,6 +588,28 @@ canvas#weightChart { width: 100%; height: 120px; }
   .wz-topbar { padding:16px 32px 12px; }
 }
 
+/* ── ONBOARDING ── */
+#onboarding { position:fixed; inset:0; z-index:3000; background:var(--bg); display:none; flex-direction:column; align-items:center; justify-content:center; padding:24px; overflow-y:auto; }
+#onboarding.show { display:flex; }
+.ob-wrap { width:100%; max-width:440px; display:flex; flex-direction:column; padding:8px 0; }
+.ob-logo { font-family:var(--head); font-size:13px; font-weight:800; letter-spacing:.15em; color:var(--lime); text-transform:uppercase; margin-bottom:32px; }
+.ob-heading { font-family:var(--head); font-size:28px; font-weight:800; line-height:1.1; margin-bottom:8px; }
+.ob-sub { font-size:13px; color:var(--muted2); margin-bottom:28px; line-height:1.5; }
+.ob-gender-row { display:flex; flex-wrap:wrap; gap:8px; }
+.ob-gender-btn { padding:8px 14px; border-radius:20px; font-family:var(--mono); font-size:11px; border:1px solid var(--border); color:var(--muted); cursor:pointer; transition:all .15s; background:var(--bg2); }
+.ob-gender-btn.sel { background:rgba(200,241,53,.1); color:var(--lime); border-color:rgba(200,241,53,.4); }
+.ob-optional { color:var(--muted); font-size:10px; font-family:var(--mono); font-weight:400; text-transform:none; letter-spacing:0; margin-left:4px; }
+.ob-submit { width:100%; padding:14px; margin-top:8px; }
+.empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 24px; text-align:center; gap:12px; }
+.empty-state-icon { width:48px; height:48px; border-radius:50%; background:var(--bg3); display:flex; align-items:center; justify-content:center; margin-bottom:4px; }
+.empty-state-icon svg { width:22px; height:22px; stroke:var(--muted); }
+.empty-state-title { font-family:var(--head); font-size:17px; font-weight:700; }
+.empty-state-msg { font-size:13px; color:var(--muted2); line-height:1.5; max-width:280px; }
+@media (min-width: 900px) {
+  #onboarding { background:rgba(0,0,0,.65); }
+  .ob-wrap { background:var(--bg); border-radius:16px; border:1px solid var(--border); box-shadow:0 24px 80px rgba(0,0,0,.6); padding:40px; }
+}
+
 /* ── PROFILE MENU ── */
 #profile-menu {
   display: none; position: absolute; right: 0; top: calc(100% + 6px);
@@ -883,6 +905,38 @@ canvas#weightChart { width: 100%; height: 120px; }
   </nav>
 </div>
 
+<!-- ══ PROFILE ONBOARDING ══ -->
+<div id="onboarding">
+  <div class="ob-wrap">
+    <div class="ob-logo">Recomp</div>
+    <div class="ob-heading">Let's set up<br>your profile</div>
+    <div class="ob-sub">Takes 30 seconds. Used to personalise your plan.</div>
+    <div class="wz-field">
+      <label class="wz-field-lbl">Full name</label>
+      <input class="inp" type="text" id="ob-name" placeholder="Jane Smith" autocomplete="name">
+    </div>
+    <div class="wz-field">
+      <label class="wz-field-lbl">Username <span class="ob-optional">(optional)</span></label>
+      <input class="inp" type="text" id="ob-username" placeholder="janesmith" autocomplete="username">
+    </div>
+    <div class="wz-field">
+      <label class="wz-field-lbl">Date of birth</label>
+      <input class="inp" type="date" id="ob-dob">
+    </div>
+    <div class="wz-field">
+      <label class="wz-field-lbl">Gender</label>
+      <div class="ob-gender-row">
+        <button class="ob-gender-btn" data-g="male" onclick="obPickGender('male')">Male</button>
+        <button class="ob-gender-btn" data-g="female" onclick="obPickGender('female')">Female</button>
+        <button class="ob-gender-btn" data-g="nonbinary" onclick="obPickGender('nonbinary')">Non-binary</button>
+        <button class="ob-gender-btn" data-g="prefer_not" onclick="obPickGender('prefer_not')">Prefer not to say</button>
+      </div>
+    </div>
+    <div class="wz-err" id="ob-err"></div>
+    <button class="tool-btn ob-submit" id="ob-submit-btn" onclick="obSubmit()">Continue</button>
+  </div>
+</div>
+
 <!-- ══ PLAN CREATION WIZARD ══ -->
 <div id="wizard">
   <div id="wz-loading">
@@ -951,21 +1005,32 @@ function logoutUser() {
   firebase.auth().signOut().then(() => {
     document.getElementById('app').style.display = 'none';
     document.getElementById('wizard').classList.remove('show');
+    document.getElementById('onboarding').classList.remove('show');
     document.getElementById('user-auth').style.display = '';
+    hasPlan = false;
   });
 }
 async function routeAfterAuth() {
-  // Load any existing plan data first
   await loadUserPlan();
-  // Decide: show wizard or main app
+  const needsOnboarding = await checkIfNeedsOnboarding();
+  if (needsOnboarding) {
+    showOnboarding();
+    return;
+  }
   const needsWizard = await checkIfNeedsWizard();
   if (needsWizard) {
-    showWizard(true); // true = first time, show skip link
+    showWizard(true);
   } else {
     document.getElementById('user-auth').style.display = 'none';
     document.getElementById('app').style.display = '';
     renderAll();
   }
+}
+async function checkIfNeedsOnboarding() {
+  try {
+    const profile = await getUserData('profile', null);
+    return !profile || !profile.name;
+  } catch { return false; }
 }
 async function checkIfNeedsWizard() {
   try {
@@ -982,12 +1047,52 @@ async function checkIfNeedsWizard() {
     return true; // no data at all — new account
   } catch { return false; }
 }
+// ── ONBOARDING ──────────────────────────────────────────────────────────────
+let obGender = null;
+function showOnboarding() {
+  document.getElementById('user-auth').style.display = 'none';
+  document.getElementById('onboarding').classList.add('show');
+}
+function obPickGender(g) {
+  obGender = g;
+  document.querySelectorAll('.ob-gender-btn').forEach(b => {
+    b.classList.toggle('sel', b.dataset.g === g);
+  });
+}
+async function obSubmit() {
+  const name = document.getElementById('ob-name').value.trim();
+  const username = document.getElementById('ob-username').value.trim();
+  const dob = document.getElementById('ob-dob').value;
+  const errEl = document.getElementById('ob-err');
+  errEl.textContent = '';
+  if (!name) { errEl.textContent = 'Please enter your name.'; return; }
+  if (!dob) { errEl.textContent = 'Please enter your date of birth.'; return; }
+  if (!obGender) { errEl.textContent = 'Please select your gender.'; return; }
+  const btn = document.getElementById('ob-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  try {
+    await firebase.auth().currentUser.updateProfile({ displayName: name });
+  } catch(e) {}
+  try {
+    await setUserData('profile', { name, username, dob, gender: obGender });
+  } catch(e) {
+    errEl.textContent = 'Something went wrong. Please try again.';
+    btn.disabled = false;
+    btn.textContent = 'Continue';
+    return;
+  }
+  document.getElementById('onboarding').classList.remove('show');
+  showWizard(true);
+}
 function checkAuth() {
   firebase.auth().onAuthStateChanged(user => {
     if (!user) {
       document.getElementById('app').style.display = 'none';
       document.getElementById('wizard').classList.remove('show');
+      document.getElementById('onboarding').classList.remove('show');
       document.getElementById('user-auth').style.display = '';
+      hasPlan = false;
     } else {
       document.getElementById('user-auth').style.display = 'none';
       routeAfterAuth();
@@ -1429,11 +1534,13 @@ let activeRecipes = RECIPES;
 let activeRecipeCats = RECIPE_CATS;
 let activePrepData = { sun: PREP_DATA.sun, thu: PREP_DATA.thu };
 let activeShopData = SHOP_DATA;
+let hasPlan = false;
 
 async function loadUserPlan() {
   try {
     const plan = await getUserData('plan', null);
     if (!plan) return;
+    hasPlan = true;
     if (plan.weeklyPlan) {
       Object.keys(plan.weeklyPlan).forEach(dow => {
         activeMeals[parseInt(dow)] = plan.weeklyPlan[dow];
@@ -1653,9 +1760,19 @@ function toggleMeal(dow, idx, wk, item) {
 // ══════════════════════════════════════════
 //  PLAN PAGE
 // ══════════════════════════════════════════
+const NO_PLAN_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2"/></svg>`;
+function emptyState(msg) {
+  return `<div class="empty-state"><div class="empty-state-icon">${NO_PLAN_SVG}</div><div class="empty-state-title">No plan yet</div><div class="empty-state-msg">${msg}</div></div>`;
+}
+
 let selectedDay = today().getDay();
 function renderPlan() {
   const tabs = document.getElementById('day-tabs');
+  if (!hasPlan) {
+    tabs.innerHTML = '';
+    document.getElementById('plan-detail').innerHTML = emptyState('Complete your plan setup to see your weekly meal plan here.');
+    return;
+  }
   const order = [1,2,3,4,5,6,0]; // Mon → Sun
   tabs.innerHTML = order.map(dow=>{
     const d = dayData(dow);
@@ -2208,6 +2325,11 @@ function showPrepTab(t) {
   renderPrep();
 }
 async function renderPrep() {
+  if (!hasPlan) {
+    document.getElementById('prep-covers').textContent = '';
+    document.getElementById('prep-list').innerHTML = emptyState('Your batch prep sessions will appear here after your plan is generated.');
+    return;
+  }
   const data = activePrepData[prepTab];
   document.getElementById('prep-covers').textContent = data.label;
   const checked = await getUserData('prep_'+prepTab, {});
@@ -2239,6 +2361,10 @@ async function resetPrep() {
 //  SHOP PAGE
 // ══════════════════════════════════════════
 async function renderShop() {
+  if (!hasPlan) {
+    document.getElementById('shop-list').innerHTML = emptyState('Your weekly shopping list will appear here after your plan is generated.');
+    return;
+  }
   const checked = await getUserData('shop', {});
   document.getElementById('shop-list').innerHTML = activeShopData.map(cat=>`
     <div class="sec-label">${cat.cat}</div>
@@ -2267,12 +2393,16 @@ async function clearShop() {
 // ══════════════════════════════════════════
 let recipeCat = 'All';
 function renderRecipeTabs() {
-  document.getElementById('recipe-tabs').innerHTML = activeRecipeCats.map(c=>
-    `<button class="rtab ${c===recipeCat?'active':''}" onclick="setRecipeCat('${c}')">${c}</button>`
-  ).join('');
+  document.getElementById('recipe-tabs').innerHTML = hasPlan
+    ? activeRecipeCats.map(c=>`<button class="rtab ${c===recipeCat?'active':''}" onclick="setRecipeCat('${c}')">${c}</button>`).join('')
+    : '';
 }
 function setRecipeCat(c) { recipeCat = c; renderRecipeTabs(); renderRecipeList(); }
 function renderRecipeList() {
+  if (!hasPlan) {
+    document.getElementById('recipe-list').innerHTML = emptyState('Your recipes will appear here after your plan is generated.');
+    return;
+  }
   const filtered = recipeCat==='All' ? activeRecipes : activeRecipes.filter(r=>r.cat===recipeCat);
   document.getElementById('recipe-list').innerHTML = filtered.map(r=>{
     const gi = activeRecipes.indexOf(r);

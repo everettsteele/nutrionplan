@@ -934,6 +934,7 @@ canvas#weightChart { width: 100%; height: 120px; }
     </div>
     <div class="wz-err" id="ob-err"></div>
     <button class="tool-btn ob-submit" id="ob-submit-btn" onclick="obSubmit()">Continue</button>
+    <span class="wz-skip-link" onclick="logoutUser()">Sign in with a different account</span>
   </div>
 </div>
 
@@ -958,6 +959,7 @@ canvas#weightChart { width: 100%; height: 120px; }
       <div class="wz-err" id="wz-err"></div>
       <button class="tool-btn wz-next-btn" id="wz-next-btn" onclick="wzNext()">Continue</button>
       <span class="wz-skip-link" id="wz-skip-link" onclick="wzSkip()" style="display:none;">I already have a plan — skip setup</span>
+      <span class="wz-skip-link" style="display:block;" onclick="logoutUser()">Sign in with a different account</span>
     </div>
   </div>
 </div>

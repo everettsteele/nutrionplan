@@ -1051,8 +1051,17 @@ async function checkIfNeedsWizard() {
 }
 // ── ONBOARDING ──────────────────────────────────────────────────────────────
 let obGender = null;
+const OB_ADJ  = ['swift','bold','lean','sharp','prime','fierce','sleek','crisp','keen','bright','strong','calm','cool','wild','quick','pure','solid','noble','brave','fresh','deep','clear','grand','iron','light','steady','true','free','chief','fleet'];
+const OB_NOUN = ['fox','hawk','bear','wolf','eagle','shark','storm','peak','ridge','cliff','stone','river','wave','spark','ember','flame','drift','breeze','tide','summit','trail','coast','forest','valley','pines','current','grove','creek','flint','dusk'];
+function genUsername() {
+  const adj  = OB_ADJ[Math.floor(Math.random() * OB_ADJ.length)];
+  const noun = OB_NOUN[Math.floor(Math.random() * OB_NOUN.length)];
+  const num  = String(Math.floor(Math.random() * 90000) + 10000);
+  return adj + noun + num;
+}
 function showOnboarding() {
   document.getElementById('user-auth').style.display = 'none';
+  document.getElementById('ob-username').value = genUsername();
   document.getElementById('onboarding').classList.add('show');
 }
 function obPickGender(g) {

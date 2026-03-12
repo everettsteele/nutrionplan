@@ -2483,7 +2483,8 @@ const WZ_SUPP_TAGS    = ['Protein powder','Creatine','Omega-3','Vitamin D','B12'
 const WZ_DAYS         = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
 const WZ_DEFAULT_DATA = () => ({
-  weightUnit:'lbs', goal:null, currentWeight:'', currentBf:'', goalWeight:'',
+  weightUnit:'lbs', goal:null, currentWeight:'', currentBf:'',
+  heightFt:'', heightIn:'', heightCm:'',
   timeline:'8', timelineCustom:'', diet:null, dietNotes:'', allergies:[],
   allergyNotes:'', cookingLevel:null, trainingDaysPerWeek:4, trainingDays:[],
   trainingType:null, equipment:[], supplementsInclude:null, supplements:[],
@@ -2573,7 +2574,8 @@ function wzValidate() {
     case 1:
       if (!wz.data.goal) return 'Please select a primary goal.';
       if (!wz.data.currentWeight) return 'Please enter your current weight.';
-      if (!wz.data.goalWeight) return 'Please enter your goal weight.';
+      if (wz.data.weightUnit === 'kg' && !wz.data.heightCm) return 'Please enter your height.';
+      if (wz.data.weightUnit === 'lbs' && !wz.data.heightFt) return 'Please enter your height.';
       return null;
     case 2:
       if (!wz.data.diet) return 'Please select a diet type.';
@@ -2626,12 +2628,20 @@ function wzStep1() {
     <div class="wz-2col">
       <div class="wz-field">
         <label class="wz-field-lbl">CURRENT WEIGHT (${u})</label>
-        <input class="inp" type="number" placeholder="e.g. 170" value="${wz.data.currentWeight}" oninput="wzInput('currentWeight',this.value)">
+        <input class="inp" type="number" placeholder="${u==='lbs'?'e.g. 170':'e.g. 77'}" value="${wz.data.currentWeight}" oninput="wzInput('currentWeight',this.value)">
       </div>
+      ${u==='lbs' ? `
       <div class="wz-field">
-        <label class="wz-field-lbl">GOAL WEIGHT (${u})</label>
-        <input class="inp" type="number" placeholder="e.g. 158" value="${wz.data.goalWeight}" oninput="wzInput('goalWeight',this.value)">
-      </div>
+        <label class="wz-field-lbl">HEIGHT</label>
+        <div class="wz-2col" style="gap:8px;">
+          <input class="inp" type="number" placeholder="ft" value="${wz.data.heightFt}" oninput="wzInput('heightFt',this.value)" style="margin:0;">
+          <input class="inp" type="number" placeholder="in" value="${wz.data.heightIn}" oninput="wzInput('heightIn',this.value)" style="margin:0;">
+        </div>
+      </div>` : `
+      <div class="wz-field">
+        <label class="wz-field-lbl">HEIGHT (cm)</label>
+        <input class="inp" type="number" placeholder="e.g. 178" value="${wz.data.heightCm}" oninput="wzInput('heightCm',this.value)">
+      </div>`}
     </div>
 
     <div class="wz-field">
@@ -2776,7 +2786,7 @@ function wzStep5() {
     ${block('Goals',1,[
       ['Goal:',goalLabel],
       ['Current weight:',`${d.currentWeight||'—'} ${d.weightUnit}`],
-      ['Goal weight:',`${d.goalWeight||'—'} ${d.weightUnit}`],
+      ['Height:',d.weightUnit==='lbs'?(d.heightFt?`${d.heightFt}ft ${d.heightIn||0}in`:'—'):(d.heightCm?`${d.heightCm} cm`:'—')],
       ['Body fat:',d.currentBf?d.currentBf+'%':'Not provided'],
       ['Timeline:',timeline],
     ])}

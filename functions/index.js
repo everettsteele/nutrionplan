@@ -51,14 +51,19 @@ function buildPrompt(inputs) {
   const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const trainingDayNames = (inputs.trainingDays || []).map(d => dayNames[d]).join(', ');
 
+  const heightStr = inputs.weightUnit === 'kg'
+    ? (inputs.heightCm ? `${inputs.heightCm} cm` : 'not provided')
+    : (inputs.heightFt ? `${inputs.heightFt}ft ${inputs.heightIn || 0}in` : 'not provided');
+
   return `Generate a complete nutrition and training plan for the following person:
 
 GOALS
 - Primary goal: ${goalLabel}
 - Current weight: ${inputs.currentWeight} ${inputs.weightUnit}
-- Goal weight: ${inputs.goalWeight} ${inputs.weightUnit}
+- Height: ${heightStr}
 - Current body fat: ${inputs.currentBf ? inputs.currentBf + '%' : 'not provided'}
 - Timeline: ${inputs.timeline || 8} weeks
+- Note: Do not set a goal weight. Calculate appropriate calorie targets from the person's stats, goal type, and timeline.
 
 DIET
 - Diet type: ${dietLabel}${inputs.dietNotes ? '\n- Additional diet notes: ' + inputs.dietNotes : ''}
@@ -195,8 +200,8 @@ exports.generatePlan = onCall({ timeoutSeconds: 300, memory: '512MiB' }, async (
 
   // Input validation
   const { wizardInputs } = request.data;
-  if (!wizardInputs || !wizardInputs.goal || !wizardInputs.currentWeight || !wizardInputs.goalWeight) {
-    throw new HttpsError('invalid-argument', 'Wizard inputs are incomplete. Required: goal, currentWeight, goalWeight.');
+  if (!wizardInputs || !wizardInputs.goal || !wizardInputs.currentWeight) {
+    throw new HttpsError('invalid-argument', 'Wizard inputs are incomplete. Required: goal, currentWeight.');
   }
 
   // API key

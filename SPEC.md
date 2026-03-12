@@ -2,7 +2,7 @@
 
 Last updated: 2026-03-12
 
-A mobile-first PWA for tracking an 8-week vegetarian body recomposition program. Single-file frontend app (public/index.html) backed by Firebase. One user; not a multi-tenant SaaS.
+A mobile-first PWA for tracking a personalized nutrition and training program. Users define their own goals, diet, and schedule via the Plan Creation Wizard. Single-file frontend app (public/index.html) backed by Firebase. One user; not a multi-tenant SaaS.
 
 ---
 
@@ -10,15 +10,9 @@ A mobile-first PWA for tracking an 8-week vegetarian body recomposition program.
 
 | Item | Value |
 |------|-------|
-| Program start | 2026-03-10 |
-| Program end | 2026-05-12 |
-| Duration | 8 weeks |
-| Starting weight | 170 lbs |
-| Starting body fat | 20% |
-| Target weight | 158–162 lbs |
-| Training days | Sun, Tue, Wed, Thu, Sat |
-| Rest days | Mon, Fri |
-| Diet | Vegetarian (whey OK) |
+| Duration | User-defined (default 8 weeks) |
+| Training days | User-defined via wizard |
+| Diet | User-defined via wizard |
 | Deployed at | https://nutritionplan-fd64b.web.app |
 
 ---

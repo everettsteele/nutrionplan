@@ -958,7 +958,6 @@ canvas#weightChart { width: 100%; height: 120px; }
     <div class="wz-footer" id="wz-footer">
       <div class="wz-err" id="wz-err"></div>
       <button class="tool-btn wz-next-btn" id="wz-next-btn" onclick="wzNext()">Continue</button>
-      <span class="wz-skip-link" id="wz-skip-link" onclick="wzSkip()" style="display:none;">I already have a plan — skip setup</span>
       <span class="wz-skip-link" style="display:block;" onclick="logoutUser()">Sign in with a different account</span>
     </div>
   </div>
@@ -999,7 +998,13 @@ function registerUserFirebase() {
   errorEl.textContent = '';
   if (!email || !password) { errorEl.textContent = 'Enter a valid email and password.'; return; }
   firebase.auth().createUserWithEmailAndPassword(email, password)
-    .catch(err => { errorEl.textContent = err.message; });
+    .catch(err => {
+      if (err.code === 'auth/email-already-in-use') {
+        errorEl.textContent = 'An account with that email already exists. Try signing in instead.';
+      } else {
+        errorEl.textContent = err.message;
+      }
+    });
   // onAuthStateChanged handles routing; new users will see the wizard
 }
 function logoutUser() {
@@ -1072,7 +1077,7 @@ function obPickGender(g) {
 }
 async function obSubmit() {
   const name = document.getElementById('ob-name').value.trim();
-  const username = document.getElementById('ob-username').value.trim();
+  const username = document.getElementById('ob-username').value.trim().toLowerCase();
   const dob = document.getElementById('ob-dob').value;
   const errEl = document.getElementById('ob-err');
   errEl.textContent = '';
@@ -1082,11 +1087,32 @@ async function obSubmit() {
   if (!obGender) { errEl.textContent = 'Please select your gender.'; return; }
   const btn = document.getElementById('ob-submit-btn');
   btn.disabled = true;
+  btn.textContent = 'Checking...';
+  // Check username uniqueness
+  try {
+    const db = firebase.firestore();
+    const unSnap = await db.collection('usernames').doc(username).get();
+    if (unSnap.exists) {
+      errEl.textContent = 'That username is already taken. Please choose another.';
+      btn.disabled = false;
+      btn.textContent = 'Continue';
+      return;
+    }
+  } catch(e) {
+    errEl.textContent = 'Could not verify username. Please try again.';
+    btn.disabled = false;
+    btn.textContent = 'Continue';
+    return;
+  }
   btn.textContent = 'Saving...';
   try {
     await firebase.auth().currentUser.updateProfile({ displayName: name });
   } catch(e) {}
   try {
+    const uid = firebase.auth().currentUser.uid;
+    const db = firebase.firestore();
+    // Reserve the username
+    await db.collection('usernames').doc(username).set({ uid });
     await setUserData('profile', { name, username, dob, gender: obGender });
   } catch(e) {
     errEl.textContent = 'Something went wrong. Please try again.';
